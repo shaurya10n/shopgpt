@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import HeaderActions from '../components/HeaderActions'
 
 export default function Home() {
   const navigate = useNavigate()
@@ -31,6 +32,10 @@ export default function Home() {
         }}
         aria-hidden="true"
       />
+
+      <div className="absolute right-6 top-6 z-20 sm:right-8 sm:top-8">
+        <HeaderActions />
+      </div>
 
       <div className="relative z-10 mx-auto w-full max-w-3xl px-6 py-20 sm:px-8">
         <p className="animate-fade-up font-display text-5xl leading-none tracking-tight text-[var(--color-ink)] sm:text-7xl md:text-8xl">
@@ -65,6 +70,13 @@ export default function Home() {
             Search
           </button>
         </form>
+
+        <p className="animate-search-in mt-5 text-sm text-[var(--color-sage)]">
+          Or{' '}
+          <Link to="/products" className="underline underline-offset-2 hover:text-[var(--color-ink)]">
+            browse all products
+          </Link>
+        </p>
       </div>
     </main>
   )

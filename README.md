@@ -13,3 +13,5 @@ npm run dev
 
 - **Home** (`/`) — ShopGPT hero with product search
 - **Products** (`/products`) — responsive grid from the [Fake Store API](https://fakestoreapi.com/); supports `?q=` search filtering
+- **Cart** (`/cart`) — add/remove items, adjust quantities, view total
+- **Chat** — docked right-side assistant that pushes the page layout; open via the “Ask ShopGPT” tab (UI only; Groq filtering coming next)

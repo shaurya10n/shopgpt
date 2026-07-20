@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import ProductCard from '../components/ProductCard'
 import ProductModal from '../components/ProductModal'
+import HeaderActions from '../components/HeaderActions'
 
 const PRODUCTS_URL = 'https://fakestoreapi.com/products'
 
@@ -55,21 +56,24 @@ export default function Products() {
   return (
     <main className="min-h-screen bg-white">
       <div className="mx-auto max-w-7xl px-6 py-12 sm:px-8 sm:py-16 lg:px-10">
-        <header className="mb-12 sm:mb-16">
-          <Link
-            to="/"
-            className="mb-6 inline-block font-display text-2xl tracking-tight text-[var(--color-ink)] transition-opacity hover:opacity-70"
-          >
-            ShopGPT
-          </Link>
-          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
-            {query ? `Results for “${query}”` : 'Products'}
-          </h1>
-          <p className="mt-2 text-sm text-neutral-500 sm:text-base">
-            {status === 'ready'
-              ? `${filtered.length} item${filtered.length === 1 ? '' : 's'}`
-              : 'From Fake Store API'}
-          </p>
+        <header className="mb-12 flex items-start justify-between gap-4 sm:mb-16">
+          <div>
+            <Link
+              to="/"
+              className="mb-6 inline-block font-display text-2xl tracking-tight text-[var(--color-ink)] transition-opacity hover:opacity-70"
+            >
+              ShopGPT
+            </Link>
+            <h1 className="text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
+              {query ? `Results for “${query}”` : 'Products'}
+            </h1>
+            <p className="mt-2 text-sm text-neutral-500 sm:text-base">
+              {status === 'ready'
+                ? `${filtered.length} item${filtered.length === 1 ? '' : 's'}`
+                : 'From Fake Store API'}
+            </p>
+          </div>
+          <HeaderActions className="pt-1" />
         </header>
 
         {status === 'loading' && (

@@ -1,6 +1,10 @@
 import { useEffect } from 'react'
+import { useCart } from '../context/CartContext'
+import { formatPrice } from '../utils/formatPrice'
 
 export default function ProductModal({ product, onClose }) {
+  const { addItem } = useCart()
+
   useEffect(() => {
     if (!product) return
 
@@ -18,11 +22,6 @@ export default function ProductModal({ product, onClose }) {
   }, [product, onClose])
 
   if (!product) return null
-
-  const formattedPrice = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(product.price)
 
   return (
     <div
@@ -60,7 +59,9 @@ export default function ProductModal({ product, onClose }) {
                 >
                   {product.title}
                 </h2>
-                <p className="text-lg font-semibold text-neutral-800">{formattedPrice}</p>
+                <p className="text-lg font-semibold text-neutral-800">
+                  {formatPrice(product.price)}
+                </p>
               </div>
               <button
                 type="button"
@@ -85,6 +86,14 @@ export default function ProductModal({ product, onClose }) {
                 {product.description}
               </p>
             </div>
+
+            <button
+              type="button"
+              onClick={() => addItem(product)}
+              className="mt-6 w-full rounded-lg bg-[var(--color-ink)] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#2a322e]"
+            >
+              Add to cart
+            </button>
           </div>
         </div>
       </div>
