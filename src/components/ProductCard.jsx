@@ -10,7 +10,7 @@ export default function ProductCard({ product, onDetails }) {
         <img
           src={product.image}
           alt={product.title}
-          className="h-full w-full object-cover"
+          className="h-full w-full object-contain p-6"
           loading="lazy"
         />
       </div>

@@ -9,6 +9,7 @@ npm install
 npm run dev
 ```
 
-## Products page
+## Pages
 
-Responsive product grid sourced from `products.json`. Each card shows image, title, price, and a Details modal with the full description.
+- **Home** (`/`) — ShopGPT hero with product search
+- **Products** (`/products`) — responsive grid from the [Fake Store API](https://fakestoreapi.com/); supports `?q=` search filtering

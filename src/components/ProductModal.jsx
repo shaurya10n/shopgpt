@@ -44,7 +44,7 @@ export default function ProductModal({ product, onClose }) {
             <img
               src={product.image}
               alt={product.title}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-contain p-8"
             />
           </div>
 
