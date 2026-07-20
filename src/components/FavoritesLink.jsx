@@ -1,13 +1,15 @@
 import { Link } from 'react-router-dom'
-import { useCart } from '../context/CartContext'
+import { useFavorites } from '../context/FavoritesContext'
 
-export default function CartLink({ className = '' }) {
-  const { itemCount } = useCart()
+export default function FavoritesLink({ className = '' }) {
+  const { favoriteCount } = useFavorites()
 
   return (
     <Link
-      to="/cart"
-      aria-label={itemCount > 0 ? `Cart, ${itemCount} items` : 'Cart'}
+      to="/favorites"
+      aria-label={
+        favoriteCount > 0 ? `Favorites, ${favoriteCount} items` : 'Favorites'
+      }
       className={`relative inline-flex h-10 w-10 items-center justify-center rounded-lg text-[var(--color-ink)] transition-colors hover:bg-black/5 ${className}`}
     >
       <svg
@@ -21,13 +23,11 @@ export default function CartLink({ className = '' }) {
         className="h-5 w-5"
         aria-hidden="true"
       >
-        <circle cx="9" cy="20" r="1.25" fill="currentColor" stroke="none" />
-        <circle cx="17" cy="20" r="1.25" fill="currentColor" stroke="none" />
-        <path d="M3 4h2l1.6 9.2a2 2 0 0 0 2 1.7h7.7a2 2 0 0 0 2-1.6L20 8H7" />
+        <path d="M12 20.5s-7.5-4.4-7.5-10A4.5 4.5 0 0 1 12 7.2 4.5 4.5 0 0 1 19.5 10.5c0 5.6-7.5 10-7.5 10Z" />
       </svg>
-      {itemCount > 0 && (
+      {favoriteCount > 0 && (
         <span className="absolute -right-0.5 -top-0.5 inline-flex min-w-4.5 items-center justify-center rounded-md bg-[var(--color-ink)] px-1 py-px text-[10px] font-semibold leading-none text-white">
-          {itemCount > 99 ? '99+' : itemCount}
+          {favoriteCount > 99 ? '99+' : favoriteCount}
         </span>
       )}
     </Link>

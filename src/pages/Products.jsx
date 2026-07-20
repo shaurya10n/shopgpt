@@ -1,57 +1,43 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import ProductCard from '../components/ProductCard'
-import ProductModal from '../components/ProductModal'
 import HeaderActions from '../components/HeaderActions'
-
-const PRODUCTS_URL = 'https://fakestoreapi.com/products'
+import { useProducts } from '../context/ProductsContext'
 
 export default function Products() {
   const [searchParams] = useSearchParams()
   const query = (searchParams.get('q') || '').trim()
-
-  const [products, setProducts] = useState([])
-  const [selected, setSelected] = useState(null)
-  const [status, setStatus] = useState('loading')
-  const [error, setError] = useState(null)
+  const {
+    products,
+    status,
+    error,
+    chatMatchedIds,
+    chatFilterLabel,
+    clearChatFilter,
+    searchProducts,
+  } = useProducts()
 
   useEffect(() => {
+    if (!query) return
+
     const controller = new AbortController()
-
-    async function loadProducts() {
-      try {
-        setStatus('loading')
-        setError(null)
-
-        const response = await fetch(PRODUCTS_URL, { signal: controller.signal })
-        if (!response.ok) {
-          throw new Error(`Failed to load products (${response.status})`)
-        }
-
-        const data = await response.json()
-        setProducts(data)
-        setStatus('ready')
-      } catch (err) {
-        if (err.name === 'AbortError') return
-        setError(err.message || 'Something went wrong')
-        setStatus('error')
-      }
-    }
-
-    loadProducts()
+    searchProducts(query, { signal: controller.signal }).catch(() => {
+      // Errors are stored on context; aborts are ignored.
+    })
     return () => controller.abort()
-  }, [])
+  }, [query, searchProducts])
 
   const filtered = useMemo(() => {
-    if (!query) return products
-    const needle = query.toLowerCase()
-    return products.filter((product) => {
-      const haystack = [product.title, product.description, product.category]
-        .join(' ')
-        .toLowerCase()
-      return haystack.includes(needle)
-    })
-  }, [products, query])
+    if (!chatMatchedIds) return products
+    const byId = new Map(products.map((product) => [product.id, product]))
+    return chatMatchedIds.map((id) => byId.get(id)).filter(Boolean)
+  }, [products, chatMatchedIds])
+
+  const heading = chatFilterLabel
+    ? `Results for “${chatFilterLabel}”`
+    : query
+      ? `Results for “${query}”`
+      : 'Products'
 
   return (
     <main className="min-h-screen bg-white">
@@ -65,33 +51,75 @@ export default function Products() {
               ShopGPT
             </Link>
             <h1 className="text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
-              {query ? `Results for “${query}”` : 'Products'}
+              {heading}
             </h1>
             <p className="mt-2 text-sm text-neutral-500 sm:text-base">
               {status === 'ready'
-                ? `${filtered.length} item${filtered.length === 1 ? '' : 's'}`
-                : 'From Fake Store API'}
+                ? `${filtered.length} Amazon item${filtered.length === 1 ? '' : 's'}`
+                : status === 'loading'
+                  ? 'Searching Amazon…'
+                  : status === 'idle'
+                    ? 'Search or chat to find products'
+                    : 'Amazon via RapidAPI'}
             </p>
+            {chatFilterLabel && (
+              <button
+                type="button"
+                onClick={clearChatFilter}
+                className="mt-3 text-sm text-neutral-600 underline underline-offset-2 transition-colors hover:text-neutral-900"
+              >
+                Clear chat label
+              </button>
+            )}
           </div>
           <HeaderActions className="pt-1" />
         </header>
 
+        {status === 'idle' && (
+          <p className="text-sm text-neutral-500">
+            Search from the homepage or ask ShopGPT to find Amazon products.
+          </p>
+        )}
+
         {status === 'loading' && (
-          <p className="text-sm text-neutral-500">Loading products…</p>
+          <p className="text-sm text-neutral-500">Loading Amazon products…</p>
         )}
 
         {status === 'error' && (
-          <p className="text-sm text-red-600" role="alert">
-            {error}
-          </p>
+          <div className="max-w-xl space-y-2" role="alert">
+            <p className="text-sm text-red-600">{error}</p>
+            {String(error || '').toLowerCase().includes('not subscribed') && (
+              <p className="text-sm text-neutral-500">
+                Subscribe to{' '}
+                <a
+                  href="https://rapidapi.com/letscrape-6bRBa3QguO5/api/real-time-amazon-data"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline underline-offset-2"
+                >
+                  Real-Time Amazon Data
+                </a>{' '}
+                on RapidAPI, then restart the dev server.
+              </p>
+            )}
+            {String(error || '').toLowerCase().includes('too many requests') && (
+              <p className="text-sm text-neutral-500">
+                RapidAPI rate limit hit — wait a moment and try again.
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => query && searchProducts(query)}
+              className="text-sm font-medium text-neutral-700 underline underline-offset-2 hover:text-neutral-900"
+            >
+              Try again
+            </button>
+          </div>
         )}
 
         {status === 'ready' && filtered.length === 0 && (
           <p className="text-sm text-neutral-500">
-            No products matched your search.{' '}
-            <Link to="/products" className="underline underline-offset-2 hover:text-neutral-800">
-              View all
-            </Link>
+            No products matched. Try another search from the homepage or chat.
           </p>
         )}
 
@@ -101,17 +129,11 @@ export default function Products() {
             aria-label="Product grid"
           >
             {filtered.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onDetails={setSelected}
-              />
+              <ProductCard key={product.id} product={product} />
             ))}
           </section>
         )}
       </div>
-
-      <ProductModal product={selected} onClose={() => setSelected(null)} />
     </main>
   )
 }

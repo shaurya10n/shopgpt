@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import HeaderActions from '../components/HeaderActions'
 
 export default function Home() {
@@ -9,7 +9,8 @@ export default function Home() {
   function handleSubmit(e) {
     e.preventDefault()
     const trimmed = query.trim()
-    navigate(trimmed ? `/products?q=${encodeURIComponent(trimmed)}` : '/products')
+    if (!trimmed) return
+    navigate(`/products?q=${encodeURIComponent(trimmed)}`)
   }
 
   return (
@@ -62,21 +63,16 @@ export default function Home() {
             placeholder="Search for jackets, jewelry, electronics…"
             className="w-full flex-1 rounded-xl border border-[var(--color-fog)] bg-white/90 px-5 py-3.5 text-base text-[var(--color-ink)] shadow-[0_1px_2px_rgba(26,31,28,0.04)] outline-none backdrop-blur-sm placeholder:text-neutral-400 focus:border-[var(--color-sage)] focus:ring-2 focus:ring-[var(--color-sage)]/20"
             autoComplete="off"
+            required
           />
           <button
             type="submit"
-            className="rounded-xl bg-[var(--color-ink)] px-6 py-3.5 text-sm font-medium text-white transition-colors hover:bg-[#2a322e] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)] sm:shrink-0"
+            disabled={!query.trim()}
+            className="rounded-xl bg-[var(--color-ink)] px-6 py-3.5 text-sm font-medium text-white transition-colors hover:bg-[#2a322e] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-40 sm:shrink-0"
           >
             Search
           </button>
         </form>
-
-        <p className="animate-search-in mt-5 text-sm text-[var(--color-sage)]">
-          Or{' '}
-          <Link to="/products" className="underline underline-offset-2 hover:text-[var(--color-ink)]">
-            browse all products
-          </Link>
-        </p>
       </div>
     </main>
   )

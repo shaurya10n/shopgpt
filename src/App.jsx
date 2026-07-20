@@ -1,11 +1,12 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
-import { CartProvider } from './context/CartContext'
+import { FavoritesProvider } from './context/FavoritesContext'
 import { ChatProvider, useChat } from './context/ChatContext'
+import { ProductsProvider } from './context/ProductsContext'
 import ChatPanel from './components/ChatPanel'
 import ChatToggle from './components/ChatToggle'
 import Home from './pages/Home'
 import Products from './pages/Products'
-import Cart from './pages/Cart'
+import Favorites from './pages/Favorites'
 
 function AppShell() {
   const { isOpen } = useChat()
@@ -18,7 +19,7 @@ function AppShell() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/products" element={<Products />} />
-          <Route path="/cart" element={<Cart />} />
+          <Route path="/favorites" element={<Favorites />} />
         </Routes>
       </div>
       <ChatPanel />
@@ -30,11 +31,13 @@ function AppShell() {
 export default function App() {
   return (
     <BrowserRouter>
-      <CartProvider>
-        <ChatProvider>
-          <AppShell />
-        </ChatProvider>
-      </CartProvider>
+      <FavoritesProvider>
+        <ProductsProvider>
+          <ChatProvider>
+            <AppShell />
+          </ChatProvider>
+        </ProductsProvider>
+      </FavoritesProvider>
     </BrowserRouter>
   )
 }
