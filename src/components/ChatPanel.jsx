@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useChat } from '../context/ChatContext'
 import { useProducts } from '../context/ProductsContext'
+import ApiErrorHelp from './ApiErrorHelp'
 
 const INITIAL_MESSAGES = [
   {
@@ -189,9 +190,9 @@ export default function ChatPanel() {
           className="border-t border-neutral-100 bg-white p-4"
         >
           {error && (
-            <p className="mb-2 px-1 text-xs text-red-600" role="alert">
-              {error}
-            </p>
+            <div className="mb-3 px-1">
+              <ApiErrorHelp error={error} />
+            </div>
           )}
           <div className="flex items-end gap-2 rounded-2xl border border-neutral-200 bg-neutral-50/80 p-2 focus-within:border-[var(--color-sage)] focus-within:ring-2 focus-within:ring-[var(--color-sage)]/15">
             <label htmlFor="chat-input" className="sr-only">

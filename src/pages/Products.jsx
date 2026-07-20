@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import ProductCard from '../components/ProductCard'
 import HeaderActions from '../components/HeaderActions'
+import ApiErrorHelp from '../components/ApiErrorHelp'
 import { useProducts } from '../context/ProductsContext'
 
 export default function Products() {
@@ -86,35 +87,10 @@ export default function Products() {
         )}
 
         {status === 'error' && (
-          <div className="max-w-xl space-y-2" role="alert">
-            <p className="text-sm text-red-600">{error}</p>
-            {String(error || '').toLowerCase().includes('not subscribed') && (
-              <p className="text-sm text-neutral-500">
-                Subscribe to{' '}
-                <a
-                  href="https://rapidapi.com/letscrape-6bRBa3QguO5/api/real-time-amazon-data"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="underline underline-offset-2"
-                >
-                  Real-Time Amazon Data
-                </a>{' '}
-                on RapidAPI, then restart the dev server.
-              </p>
-            )}
-            {String(error || '').toLowerCase().includes('too many requests') && (
-              <p className="text-sm text-neutral-500">
-                RapidAPI rate limit hit — wait a moment and try again.
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={() => query && searchProducts(query)}
-              className="text-sm font-medium text-neutral-700 underline underline-offset-2 hover:text-neutral-900"
-            >
-              Try again
-            </button>
-          </div>
+          <ApiErrorHelp
+            error={error}
+            onRetry={() => query && searchProducts(query)}
+          />
         )}
 
         {status === 'ready' && filtered.length === 0 && (

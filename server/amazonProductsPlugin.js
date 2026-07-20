@@ -25,8 +25,25 @@ function createProductsHandler(apiKey) {
       return
     }
 
+    if (!apiKey) {
+      sendJson(res, 500, {
+        error:
+          'RAPIDAPI_KEY is missing. Copy .env.example to .env and add your RapidAPI key.',
+        code: 'MISSING_RAPIDAPI_KEY',
+      })
+      return
+    }
+
     try {
-      const query = url.searchParams.get('query') || 'electronics'
+      const query = url.searchParams.get('query') || ''
+      if (!query.trim()) {
+        sendJson(res, 400, {
+          error: 'query is required',
+          code: 'MISSING_QUERY',
+        })
+        return
+      }
+
       const page = Number(url.searchParams.get('page') || 1)
       const minPrice = url.searchParams.get('min_price')
       const maxPrice = url.searchParams.get('max_price')
@@ -42,8 +59,16 @@ function createProductsHandler(apiKey) {
       sendJson(res, 200, result)
     } catch (error) {
       console.error('[api/products]', error)
+      const message = error.message || 'Failed to fetch Amazon products'
       sendJson(res, error.status || 500, {
-        error: error.message || 'Failed to fetch Amazon products',
+        error: message,
+        code: /too many requests/i.test(message)
+          ? 'RATE_LIMITED'
+          : /not subscribed/i.test(message)
+            ? 'NOT_SUBSCRIBED'
+            : /RAPIDAPI_KEY/i.test(message)
+              ? 'MISSING_RAPIDAPI_KEY'
+              : undefined,
         details: error.payload || undefined,
       })
     }

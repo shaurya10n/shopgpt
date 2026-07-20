@@ -1,5 +1,11 @@
 import Groq from 'groq-sdk'
 import { searchAmazonProducts } from './amazonClient.js'
+import {
+  latestUserText,
+  parsePriceFromText,
+  refineProducts,
+  toNumberOrNull,
+} from './productRefine.js'
 
 const SYSTEM_PROMPT = `You are ShopGPT, a shopping assistant that searches Amazon from natural language.
 
@@ -37,127 +43,14 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload))
 }
 
-function toNumberOrNull(value) {
-  if (value === null || value === undefined || value === '') return null
-  const n = Number(value)
-  return Number.isFinite(n) ? n : null
-}
-
-function latestUserText(messages) {
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    if (messages[i]?.role === 'user' && messages[i]?.content) {
-      return String(messages[i].content)
-    }
-  }
-  return ''
-}
-
-function parsePriceFromText(text) {
-  const normalized = text.toLowerCase().replace(/,/g, '')
-  let maxPrice = null
-  let minPrice = null
-
-  const between = normalized.match(
-    /between\s*\$?\s*(\d+(?:\.\d+)?)\s*(?:and|to|-)\s*\$?\s*(\d+(?:\.\d+)?)/,
-  )
-  if (between) {
-    minPrice = Number(between[1])
-    maxPrice = Number(between[2])
-    if (minPrice > maxPrice) [minPrice, maxPrice] = [maxPrice, minPrice]
-    return { minPrice, maxPrice, maxExclusive: false }
-  }
-
-  const under = normalized.match(
-    /(?:under|below|less than|cheaper than|upto|up to)\s*\$?\s*(\d+(?:\.\d+)?)/,
-  )
-  if (under) {
-    return { minPrice, maxPrice: Number(under[1]), maxExclusive: true }
-  }
-
-  const atMost = normalized.match(
-    /(?:at most|no more than|max(?:imum)?(?:\s+of)?|<=|≤)\s*\$?\s*(\d+(?:\.\d+)?)/,
-  )
-  if (atMost) {
-    return { minPrice, maxPrice: Number(atMost[1]), maxExclusive: false }
-  }
-
-  const over = normalized.match(
-    /(?:over|above|more than|at least|minimum|>=|≥)\s*\$?\s*(\d+(?:\.\d+)?)/,
-  )
-  if (over) {
-    minPrice = Number(over[1])
-  }
-
-  return { minPrice, maxPrice, maxExclusive: true }
-}
-
-function textBlob(product) {
-  return `${product.title} ${product.category} ${product.description}`.toLowerCase()
-}
-
-function termHits(product, terms) {
-  if (!terms.length) return 0
-  const blob = textBlob(product)
-  return terms.reduce(
-    (score, term) => score + (blob.includes(String(term).toLowerCase()) ? 1 : 0),
-    0,
-  )
-}
-
-function withinPrice(product, { minPrice, maxPrice, maxExclusive }) {
-  const price = Number(product.price)
-  if (!Number.isFinite(price)) return false
-  if (minPrice != null && price < minPrice) return false
-  if (maxPrice != null) {
-    if (maxExclusive ? price >= maxPrice : price > maxPrice) return false
-  }
-  return true
-}
-
-function narrowByTerms(priced, requiredTerms) {
-  if (!requiredTerms.length) return priced
-
-  const withAll = priced.filter(
-    (product) => termHits(product, requiredTerms) === requiredTerms.length,
-  )
-  if (withAll.length) return withAll
-
-  const withAny = priced.filter((product) => termHits(product, requiredTerms) > 0)
-  return withAny.length ? withAny : priced
-}
-
-function refineProducts(products, parsed, userText) {
-  const fromText = parsePriceFromText(userText)
-  const minPrice = toNumberOrNull(parsed.minPrice) ?? fromText.minPrice
-  const maxPrice = toNumberOrNull(parsed.maxPrice) ?? fromText.maxPrice
-  const maxExclusive =
-    fromText.maxPrice != null
-      ? fromText.maxExclusive
-      : /under|below|less than|cheaper than/i.test(userText)
-
-  const requiredTerms = Array.isArray(parsed.requiredTerms)
-    ? parsed.requiredTerms.map(String).filter(Boolean)
-    : []
-  const optionalTerms = Array.isArray(parsed.optionalTerms)
-    ? parsed.optionalTerms.map(String).filter(Boolean)
-    : []
-
-  const priced = products.filter((product) =>
-    withinPrice(product, { minPrice, maxPrice, maxExclusive }),
-  )
-  const eligible = narrowByTerms(priced, requiredTerms)
-
-  return [...eligible].sort(
-    (a, b) =>
-      termHits(b, requiredTerms) * 3 +
-        termHits(b, optionalTerms) * 2 -
-        (termHits(a, requiredTerms) * 3 + termHits(a, optionalTerms) * 2) ||
-      a.price - b.price,
-  )
-}
-
 function createChatHandler({ groqApiKey, rapidApiKey }) {
-  const groq = new Groq({ apiKey: groqApiKey })
+  let groq = null
+
+  function getGroq() {
+    if (!groqApiKey) return null
+    if (!groq) groq = new Groq({ apiKey: groqApiKey })
+    return groq
+  }
 
   return async function chatHandler(req, res, next) {
     const url = req.url?.split('?')[0]
@@ -178,7 +71,20 @@ function createChatHandler({ groqApiKey, rapidApiKey }) {
     }
 
     if (!groqApiKey) {
-      sendJson(res, 500, { error: 'GROQ_API_KEY is not configured' })
+      sendJson(res, 500, {
+        error:
+          'GROQ_API_KEY is missing. Copy .env.example to .env and add your Groq key.',
+        code: 'MISSING_GROQ_KEY',
+      })
+      return
+    }
+
+    if (!rapidApiKey) {
+      sendJson(res, 500, {
+        error:
+          'RAPIDAPI_KEY is missing. Copy .env.example to .env and add your RapidAPI key.',
+        code: 'MISSING_RAPIDAPI_KEY',
+      })
       return
     }
 
@@ -193,8 +99,9 @@ function createChatHandler({ groqApiKey, rapidApiKey }) {
       }
 
       const userText = latestUserText(messages)
+      const client = getGroq()
 
-      const completion = await groq.chat.completions.create({
+      const completion = await client.chat.completions.create({
         model: 'llama-3.3-70b-versatile',
         temperature: 0,
         response_format: { type: 'json_object' },
@@ -222,10 +129,14 @@ function createChatHandler({ groqApiKey, rapidApiKey }) {
       const searchQuery =
         typeof parsed.searchQuery === 'string' && parsed.searchQuery.trim()
           ? parsed.searchQuery.trim()
-          : userText.replace(
-              /under\s*\$?\s*\d+|below\s*\$?\s*\d+|less than\s*\$?\s*\d+|between\s*\$?\s*\d+\s*(and|to)\s*\$?\s*\d+/gi,
-              '',
-            ).trim() || userText.trim() || 'products'
+          : userText
+              .replace(
+                /under\s*\$?\s*\d+|below\s*\$?\s*\d+|less than\s*\$?\s*\d+|between\s*\$?\s*\d+\s*(and|to)\s*\$?\s*\d+/gi,
+                '',
+              )
+              .trim() ||
+            userText.trim() ||
+            'products'
 
       if (parsed.clearFilters) {
         sendJson(res, 200, {
@@ -244,7 +155,6 @@ function createChatHandler({ groqApiKey, rapidApiKey }) {
         apiKey: rapidApiKey,
         query: searchQuery,
         minPrice: minPrice ?? undefined,
-        // Amazon max_price is "lower than" — pass through; we also refine client-side
         maxPrice: maxPrice ?? undefined,
       })
 
@@ -271,8 +181,14 @@ function createChatHandler({ groqApiKey, rapidApiKey }) {
       })
     } catch (error) {
       console.error('[api/chat]', error)
+      const message = error?.message || 'Failed to search products'
       sendJson(res, error.status || 500, {
-        error: error?.message || 'Failed to search products',
+        error: message,
+        code: /too many requests/i.test(message)
+          ? 'RATE_LIMITED'
+          : /not subscribed/i.test(message)
+            ? 'NOT_SUBSCRIBED'
+            : undefined,
         details: error.payload || undefined,
       })
     }
