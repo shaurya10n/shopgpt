@@ -4,6 +4,8 @@ import {
   parsePriceFromText,
   refineProducts,
   withinPrice,
+  isRefinementMessage,
+  resolveSearchQuery,
 } from './productRefine.js'
 
 describe('parseAmazonPrice', () => {
@@ -106,5 +108,23 @@ describe('refineProducts', () => {
     )
 
     expect(result.map((p) => p.id)).toEqual(['cheap'])
+  })
+})
+
+describe('isRefinementMessage / resolveSearchQuery', () => {
+  it('detects price-only refinements', () => {
+    expect(isRefinementMessage('show results under 40')).toBe(true)
+    expect(isRefinementMessage('under $50')).toBe(true)
+    expect(isRefinementMessage('wireless headphones')).toBe(false)
+  })
+
+  it('keeps the current search when refining', () => {
+    expect(
+      resolveSearchQuery({
+        parsedQuery: 'results',
+        userText: 'show results under 40',
+        currentSearchQuery: 'headphones',
+      }),
+    ).toBe('headphones')
   })
 })

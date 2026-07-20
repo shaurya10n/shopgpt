@@ -6,6 +6,8 @@ Search or chat in plain English (“gaming monitor under $800”), browse ranked
 
 > Clone-and-run project — not a hosted app. Add your own API keys locally.
 
+![ShopGPT demo](docs/screenshots/demo.gif)
+
 ## Features
 
 - **Homepage search** — query Amazon via RapidAPI
@@ -97,10 +99,6 @@ server/        Vite middleware: Amazon client, Groq chat, refine helpers, tests
 docs/          Extra documentation / screenshot placeholders
 .env.example   Required environment variables
 ```
-
-## Screenshots
-
-Add UI captures under [`docs/screenshots/`](docs/screenshots/) (homepage, results grid, chat panel) and link them here when you have them.
 
 ## Tradeoffs
 

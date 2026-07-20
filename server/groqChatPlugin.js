@@ -4,6 +4,7 @@ import {
   latestUserText,
   parsePriceFromText,
   refineProducts,
+  resolveSearchQuery,
   toNumberOrNull,
 } from './productRefine.js'
 
@@ -22,10 +23,15 @@ Reply with ONLY valid JSON (no markdown) using this shape:
 
 Rules:
 - searchQuery: concise Amazon search keywords (no price words). Example: "black running shoes", "wireless headphones".
-- maxPrice / minPrice: numbers or null. "under $800" / "below 800" / "less than 800" => maxPrice 800. "over $50" => minPrice 50. "between 20 and 100" => minPrice 20, maxPrice 100.
-- requiredTerms: core product nouns only (e.g. "monitor", "pants"). Do NOT put modifiers like "gaming", colors, or brands here.
-- optionalTerms: modifiers that boost ranking (e.g. "gaming", "black", "curved").
-- If the user wants to reset / see everything, set clearFilters to true and searchQuery to "".
+- maxPrice / minPrice: numbers or null. "under $800" / "below 800" / "less than 800" / "under 40" => maxPrice 800 or 40. "over $50" => minPrice 50. "between 20 and 100" => minPrice 20, maxPrice 100.
+- requiredTerms: core product nouns only (e.g. "monitor", "headphones", "pants"). Do NOT put modifiers like "gaming", colors, or brands here.
+- optionalTerms: modifiers that boost ranking (e.g. "gaming", "black", "wireless").
+- IMPORTANT — current search context: when a Current search query is provided, the user is usually refining those results (price, color, brand, etc.). In that case:
+  - Keep searchQuery as the current search query (or a slight improvement that still includes the same product intent).
+  - Do NOT replace it with unrelated words like "results", "show", "items", or a different product category.
+  - Example: current="headphones", user="show results under 40" => searchQuery="headphones", maxPrice=40.
+- Only change to a brand-new searchQuery when the user clearly asks for a different product type.
+- If the user wants to reset / clear everything, set clearFilters to true and searchQuery to "".
 - Keep message concise (1-2 sentences). Prefer precision over recall.`
 
 function readBody(req) {
@@ -92,6 +98,10 @@ function createChatHandler({ groqApiKey, rapidApiKey }) {
       const raw = await readBody(req)
       const body = JSON.parse(raw || '{}')
       const messages = Array.isArray(body.messages) ? body.messages : []
+      const currentSearchQuery =
+        typeof body.currentSearchQuery === 'string'
+          ? body.currentSearchQuery.trim()
+          : ''
 
       if (messages.length === 0) {
         sendJson(res, 400, { error: 'messages are required' })
@@ -101,6 +111,10 @@ function createChatHandler({ groqApiKey, rapidApiKey }) {
       const userText = latestUserText(messages)
       const client = getGroq()
 
+      const contextBlock = currentSearchQuery
+        ? `Current search query: "${currentSearchQuery}"\nThe user is looking at Amazon results for that query. Treat follow-ups as refinements unless they clearly ask for a different product.\n\n`
+        : 'No current search query — start a new Amazon search from the user message.\n\n'
+
       const completion = await client.chat.completions.create({
         model: 'llama-3.3-70b-versatile',
         temperature: 0,
@@ -109,7 +123,7 @@ function createChatHandler({ groqApiKey, rapidApiKey }) {
           { role: 'system', content: SYSTEM_PROMPT },
           {
             role: 'user',
-            content: `Conversation:\n${JSON.stringify(messages)}`,
+            content: `${contextBlock}Conversation:\n${JSON.stringify(messages)}`,
           },
         ],
       })
@@ -126,17 +140,11 @@ function createChatHandler({ groqApiKey, rapidApiKey }) {
       const fromText = parsePriceFromText(userText)
       const minPrice = toNumberOrNull(parsed.minPrice) ?? fromText.minPrice
       const maxPrice = toNumberOrNull(parsed.maxPrice) ?? fromText.maxPrice
-      const searchQuery =
-        typeof parsed.searchQuery === 'string' && parsed.searchQuery.trim()
-          ? parsed.searchQuery.trim()
-          : userText
-              .replace(
-                /under\s*\$?\s*\d+|below\s*\$?\s*\d+|less than\s*\$?\s*\d+|between\s*\$?\s*\d+\s*(and|to)\s*\$?\s*\d+/gi,
-                '',
-              )
-              .trim() ||
-            userText.trim() ||
-            'products'
+      const searchQuery = resolveSearchQuery({
+        parsedQuery: parsed.searchQuery,
+        userText,
+        currentSearchQuery,
+      })
 
       if (parsed.clearFilters) {
         sendJson(res, 200, {
@@ -158,7 +166,20 @@ function createChatHandler({ groqApiKey, rapidApiKey }) {
         maxPrice: maxPrice ?? undefined,
       })
 
-      const products = refineProducts(result.products, parsed, userText)
+      // Merge model + text-derived price into refine so "under 40" always sticks
+      const products = refineProducts(
+        result.products,
+        {
+          ...parsed,
+          minPrice,
+          maxPrice,
+          requiredTerms:
+            Array.isArray(parsed.requiredTerms) && parsed.requiredTerms.length
+              ? parsed.requiredTerms
+              : searchQuery.split(/\s+/).filter((t) => t.length > 2).slice(0, 2),
+        },
+        userText,
+      )
 
       let message =
         typeof parsed.message === 'string' && parsed.message.trim()

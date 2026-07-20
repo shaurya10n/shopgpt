@@ -8,14 +8,14 @@ const INITIAL_MESSAGES = [
   {
     id: 'welcome',
     role: 'assistant',
-    text: 'Hi — tell me what you’re shopping for on Amazon. Try “gaming monitor under $800” or “wireless headphones”.',
+    text: 'Hi — tell me what you’re shopping for on Amazon, or refine the results you’re viewing.',
   },
 ]
 
 export default function ChatPanel() {
   const navigate = useNavigate()
   const { isOpen, closeChat } = useChat()
-  const { replaceProducts, clearChatFilter } = useProducts()
+  const { replaceProducts, clearChatFilter, activeQuery } = useProducts()
   const [messages, setMessages] = useState(INITIAL_MESSAGES)
   const [draft, setDraft] = useState('')
   const [isThinking, setIsThinking] = useState(false)
@@ -23,6 +23,10 @@ export default function ChatPanel() {
   const listRef = useRef(null)
   const inputRef = useRef(null)
   const titleId = useId()
+
+  const placeholder = activeQuery
+    ? `Refine results for “${activeQuery}”`
+    : 'Search Amazon in plain language…'
 
   useEffect(() => {
     if (!isOpen) return
@@ -72,6 +76,7 @@ export default function ChatPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: history.length ? history : [{ role: 'user', content: text }],
+          currentSearchQuery: activeQuery || '',
         }),
       })
 
@@ -93,9 +98,10 @@ export default function ChatPanel() {
         clearChatFilter()
         replaceProducts([], { query: '', label: '' })
       } else {
+        const nextQuery = data.searchQuery || activeQuery || text
         replaceProducts(data.products || [], {
-          query: data.searchQuery || text,
-          label: text,
+          query: nextQuery,
+          label: activeQuery ? `${activeQuery} · ${text}` : text,
         })
       }
 
@@ -134,7 +140,11 @@ export default function ChatPanel() {
             >
               ShopGPT
             </p>
-            <p className="mt-0.5 text-xs text-neutral-500">Amazon shopping assistant</p>
+            <p className="mt-0.5 text-xs text-neutral-500">
+              {activeQuery
+                ? `Refining “${activeQuery}”`
+                : 'Amazon shopping assistant'}
+            </p>
           </div>
           <button
             type="button"
@@ -179,7 +189,7 @@ export default function ChatPanel() {
           {isThinking && (
             <div className="flex justify-start">
               <div className="rounded-2xl rounded-bl-md bg-[var(--color-mist)] px-3.5 py-2.5 text-sm text-neutral-500">
-                Searching Amazon…
+                {activeQuery ? 'Refining results…' : 'Searching Amazon…'}
               </div>
             </div>
           )}
@@ -210,7 +220,7 @@ export default function ChatPanel() {
                   e.currentTarget.form?.requestSubmit()
                 }
               }}
-              placeholder="e.g. gaming monitor under $800"
+              placeholder={placeholder}
               disabled={isThinking}
               className="max-h-28 min-h-[40px] flex-1 resize-none bg-transparent px-2 py-2 text-sm text-neutral-900 outline-none placeholder:text-neutral-400 disabled:opacity-60"
             />
